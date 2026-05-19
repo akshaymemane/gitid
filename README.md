@@ -13,6 +13,16 @@ npm install -g @akshaymemane/git-id
 
 The npm package installs the `gitid` command. macOS and Linux binaries are bundled for arm64 and x64.
 
+## What's New in 0.2
+
+GitID now uses Charm libraries for a cleaner terminal experience:
+
+- styled success, warning, and failure states
+- a readable profiles table
+- a grouped `gitid doctor` report
+- a guided interactive form for `gitid add`
+- `--plain` and `NO_COLOR=1` support for scripts and simple terminals
+
 ## Quick Start
 
 ```bash
@@ -21,6 +31,12 @@ gitid add work --user "Work Name" --email work@example.com --github work-github 
 gitid add personal --user "Personal Name" --email me@example.com --github personal-github --ssh-key ~/.ssh/personal_ed25519
 gitid switch work
 gitid current
+```
+
+Interactive setup is also supported:
+
+```bash
+gitid add work
 ```
 
 Generate a new SSH key while adding a profile:
@@ -43,6 +59,13 @@ gitid auto enable --install # append shell hook to ~/.zshrc or ~/.bashrc
 gitid doctor               # diagnose local setup
 gitid backup               # back up ~/.gitconfig and ~/.ssh/config
 gitid restore              # restore latest backups
+```
+
+Plain output for automation:
+
+```bash
+gitid --plain doctor
+NO_COLOR=1 gitid list
 ```
 
 Useful aliases:

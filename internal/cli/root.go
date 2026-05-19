@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
 	"github.com/gitid/gitid/internal/backup"
@@ -17,9 +19,14 @@ import (
 	"github.com/gitid/gitid/internal/git"
 	"github.com/gitid/gitid/internal/github"
 	"github.com/gitid/gitid/internal/ssh"
+	"github.com/gitid/gitid/internal/ui"
 )
 
 var verbose bool
+var plain bool
+var out io.Writer = os.Stdout
+var errOut io.Writer = os.Stderr
+var appUI = ui.New(os.Stdout, ui.Options{})
 
 var rootCmd = &cobra.Command{
 	Use:           "gitid",
@@ -27,11 +34,15 @@ var rootCmd = &cobra.Command{
 	Long:          "gitid helps developers manage multiple Git identities across profiles, repos, SSH keys, and GitHub CLI accounts.",
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		configureUI()
+	},
 }
 
 func Execute() {
+	configureUI()
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "gitid:", err)
+		fmt.Fprintln(errOut, "gitid:", err)
 		os.Exit(1)
 	}
 }
@@ -52,7 +63,8 @@ var setupCmd = &cobra.Command{
 		if err := config.SaveConfig(cfg); err != nil {
 			return err
 		}
-		fmt.Printf("Initialized gitid at %s\n", dir)
+		appUI.Success("Initialized gitid")
+		appUI.KeyValue("Config", appUI.Path(dir))
 		return nil
 	},
 }
@@ -139,21 +151,25 @@ var currentCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Config: %s\n", mustConfigPath())
+		appUI.Heading("Current Identity")
+		appUI.KeyValue("Config", mustConfigPath())
 		if cfg.Active == "" {
-			fmt.Println("Current Profile: none")
+			appUI.Warning("Current profile is not set")
 		} else {
-			fmt.Printf("Current Profile: %s\n", cfg.Active)
+			appUI.KeyValue("Current Profile", cfg.Active)
 			if profile, _ := config.FindProfile(cfg, cfg.Active); profile != nil {
 				printProfile(*profile)
 			}
 		}
 		name, email, err := git.CurrentIdentity()
 		if err != nil {
-			fmt.Printf("\nGit Config:\n  %s\n", err)
+			appUI.Section("Git Config")
+			appUI.Warning("%s", err)
 			return nil
 		}
-		fmt.Printf("\nGit Config:\n  %s\n  %s\n", name, email)
+		appUI.Section("Git Config")
+		appUI.KeyValue("Name", name)
+		appUI.KeyValue("Email", email)
 		return nil
 	},
 }
@@ -177,7 +193,7 @@ var attachCmd = &cobra.Command{
 		}
 		for _, existing := range profile.AutoSwitch.Folders {
 			if existing == folder {
-				fmt.Printf("%s is already attached to %s\n", folder, profile.Name)
+				appUI.Warning("%s is already attached to %s", appUI.Path(folder), appUI.ProfileName(profile.Name))
 				return nil
 			}
 		}
@@ -186,7 +202,9 @@ var attachCmd = &cobra.Command{
 		if err := config.SaveConfig(cfg); err != nil {
 			return err
 		}
-		fmt.Printf("Attached %s to profile %s\n", folder, profile.Name)
+		appUI.Success("Attached folder")
+		appUI.KeyValue("Profile", profile.Name)
+		appUI.KeyValue("Folder", folder)
 		return nil
 	},
 }
@@ -210,10 +228,10 @@ var autoEnableCmd = &cobra.Command{
 		}
 		install, _ := cmd.Flags().GetBool("install")
 		if !install {
-			fmt.Println("Auto switching enabled in gitid config.")
-			fmt.Println("Add this to your shell profile:")
-			fmt.Println()
-			fmt.Println(hookScript())
+			appUI.Success("Auto switching enabled")
+			appUI.Hint("Add the shell hook below to your shell profile")
+			appUI.Println()
+			appUI.Println(hookScript())
 			return nil
 		}
 		path, err := shellProfilePath()
@@ -223,11 +241,12 @@ var autoEnableCmd = &cobra.Command{
 		if backupPath, err := backup.Create(path, "shell_profile"); err != nil {
 			return err
 		} else if backupPath != "" && verbose {
-			fmt.Printf("Backup: %s\n", backupPath)
+			appUI.KeyValue("Backup", backupPath)
 		}
 		existing, _ := os.ReadFile(path)
 		if strings.Contains(string(existing), "gitid auto apply") {
-			fmt.Printf("Shell hook already installed in %s\n", path)
+			appUI.Warning("Shell hook already installed")
+			appUI.KeyValue("File", path)
 			return nil
 		}
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -241,7 +260,8 @@ var autoEnableCmd = &cobra.Command{
 		if _, err := fmt.Fprintf(f, "\n# gitid automatic switching\n%s\n", hookScript()); err != nil {
 			return err
 		}
-		fmt.Printf("Installed auto-switch hook in %s\n", path)
+		appUI.Success("Installed auto-switch hook")
+		appUI.KeyValue("File", path)
 		return nil
 	},
 }
@@ -263,7 +283,7 @@ var autoHookCmd = &cobra.Command{
 	Use:   "hook",
 	Short: "Print the shell hook for automatic switching",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(hookScript())
+		appUI.Println(hookScript())
 	},
 }
 
@@ -313,9 +333,11 @@ var backupCmd = &cobra.Command{
 				return err
 			}
 			if backupPath == "" {
-				fmt.Printf("Skipped missing %s\n", item.path)
+				appUI.Warning("Skipped missing %s", item.path)
 			} else {
-				fmt.Printf("Backed up %s -> %s\n", item.path, backupPath)
+				appUI.Success("Backed up %s", item.label)
+				appUI.KeyValue("Source", item.path)
+				appUI.KeyValue("Backup", backupPath)
 			}
 		}
 		return nil
@@ -336,10 +358,12 @@ var restoreCmd = &cobra.Command{
 		} {
 			src, err := backup.RestoreLatest(item.label, item.path)
 			if err != nil {
-				fmt.Printf("Skipped %s: %s\n", item.path, err)
+				appUI.Warning("Skipped %s: %s", item.path, err)
 				continue
 			}
-			fmt.Printf("Restored %s from %s\n", item.path, src)
+			appUI.Success("Restored %s", item.label)
+			appUI.KeyValue("Target", item.path)
+			appUI.KeyValue("Backup", src)
 		}
 		return nil
 	},
@@ -368,14 +392,22 @@ func addProfile(cmd *cobra.Command, args []string) error {
 	gpgKey, _ := cmd.Flags().GetString("gpg-key")
 
 	var err error
-	if name, err = promptIfMissing(reader, "Profile Name", name); err != nil {
-		return err
-	}
-	if user, err = promptIfMissing(reader, "Git Username", user); err != nil {
-		return err
-	}
-	if email, err = promptIfMissing(reader, "Git Email", email); err != nil {
-		return err
+	if name == "" || user == "" || email == "" {
+		if isTerminal() && !appUI.Plain() {
+			if err := runAddForm(&name, &user, &email, &githubUser, &sshKey, &generateSSH, &ghAuth); err != nil {
+				return err
+			}
+		} else {
+			if name, err = promptIfMissing(reader, "Profile Name", name); err != nil {
+				return err
+			}
+			if user, err = promptIfMissing(reader, "Git Username", user); err != nil {
+				return err
+			}
+			if email, err = promptIfMissing(reader, "Git Email", email); err != nil {
+				return err
+			}
+		}
 	}
 	if githubUser == "" {
 		githubUser = name
@@ -427,15 +459,19 @@ func addProfile(cmd *cobra.Command, args []string) error {
 	if _, err := ssh.ApplyConfig(cfg, ssh.ApplyOptions{}); err != nil {
 		return err
 	}
-	fmt.Printf("Added profile: %s\n", name)
+	appUI.Success("Added profile %s", name)
+	appUI.KeyValue("Git", fmt.Sprintf("%s <%s>", user, email))
+	if githubUser != "" {
+		appUI.KeyValue("GitHub", githubUser)
+	}
 	if sshKey != "" {
 		if publicKey, err := ssh.PublicKeyPath(sshKey); err == nil {
-			fmt.Printf("SSH key: %s\n", publicKey)
+			appUI.KeyValue("SSH public key", publicKey)
 		}
 	}
 	if ghAuth {
 		if !github.IsAvailable() {
-			fmt.Println("GitHub CLI not installed; skipped gh auth login")
+			appUI.Warning("GitHub CLI not installed; skipped gh auth login")
 		} else {
 			login := exec.Command("gh", "auth", "login", "--hostname", host)
 			login.Stdin = os.Stdin
@@ -480,26 +516,35 @@ func switchProfile(profileName string, opts switchOptions) error {
 		return nil
 	}
 	if opts.DryRun {
-		fmt.Printf("Dry run for profile: %s\n", profileName)
+		appUI.Heading("Switch Preview")
+		appUI.KeyValue("Profile", profileName)
 	} else {
-		fmt.Printf("Switched to profile: %s\n", profileName)
+		appUI.Success("Switched to profile %s", profileName)
 	}
-	fmt.Printf("Git identity updated (%s: %s)\n", strings.TrimPrefix(gitResult.Scope, "--"), gitResult.Target)
+	appUI.Section("Git")
+	appUI.KeyValue("Scope", strings.TrimPrefix(gitResult.Scope, "--"))
+	appUI.KeyValue("Target", gitResult.Target)
 	for _, change := range gitResult.Changes {
-		fmt.Printf("  - %s\n", change)
+		appUI.Bullet(change)
 	}
 	if len(sshResult.Changes) > 0 {
-		fmt.Println("SSH config updated")
+		appUI.Section("SSH")
 		for _, change := range sshResult.Changes {
-			fmt.Printf("  - %s\n", change)
+			appUI.Bullet(change)
 		}
 	}
 	if ghMessage != "" {
-		fmt.Println(ghMessage)
+		appUI.Section("GitHub")
+		if strings.Contains(strings.ToLower(ghMessage), "skipped") {
+			appUI.Warning("%s", ghMessage)
+		} else {
+			appUI.Success("%s", ghMessage)
+		}
 	}
 	if verbose {
+		appUI.Section("Backups")
 		for _, path := range append(gitResult.Backups, sshResult.Backups...) {
-			fmt.Printf("Backup: %s\n", path)
+			appUI.KeyValue("Backup", path)
 		}
 	}
 	return nil
@@ -510,6 +555,8 @@ func runDoctor() error {
 	if err != nil {
 		return err
 	}
+	appUI.Heading("GitID Doctor")
+	appUI.Section("Core")
 	ok("Config readable", mustConfigPath())
 	if git.IsAvailable() {
 		ok("Git installed", "")
@@ -522,6 +569,7 @@ func runDoctor() error {
 	} else {
 		ok("Git identity", fmt.Sprintf("%s <%s>", name, email))
 	}
+	appUI.Section("Profile")
 	if cfg.Active == "" {
 		warn("Active profile", "none")
 	} else if profile, _ := config.FindProfile(cfg, cfg.Active); profile == nil {
@@ -541,12 +589,14 @@ func runDoctor() error {
 		} else {
 			warn("SSH agent", "SSH_AUTH_SOCK is not set")
 		}
+		appUI.Section("GitHub")
 		if status, err := github.Status(profile.GitHub.Hostname); err != nil {
 			warn("GitHub auth", firstLine(status, err.Error()))
 		} else {
 			ok("GitHub auth", firstLine(status, "authenticated"))
 		}
 	}
+	appUI.Section("Repository")
 	if git.IsInsideGitRepo() {
 		if remote, err := git.RemoteURL(); err == nil {
 			if strings.HasPrefix(remote, "https://") {
@@ -557,27 +607,28 @@ func runDoctor() error {
 		} else {
 			warn("Remote origin", "origin remote not configured")
 		}
+	} else {
+		warn("Git repository", "not inside a Git worktree")
 	}
+	appUI.Section("Automation")
 	if !cfg.AutoSwitchEnabled {
 		warn("Auto switching", "disabled")
 	} else {
 		ok("Auto switching", "enabled")
 	}
+	printDoctorHints(cfg)
 	return nil
 }
 
 func printProfile(profile config.Profile) {
-	fmt.Println()
-	fmt.Println("Git:")
-	fmt.Printf("  %s\n", profile.Git.Username)
-	fmt.Printf("  %s\n", profile.Git.Email)
+	appUI.Section("Profile Details")
+	appUI.KeyValue("Git name", profile.Git.Username)
+	appUI.KeyValue("Git email", profile.Git.Email)
 	if profile.GitHub.Username != "" {
-		fmt.Println("GitHub:")
-		fmt.Printf("  %s\n", profile.GitHub.Username)
+		appUI.KeyValue("GitHub", profile.GitHub.Username)
 	}
 	if profile.SSH.KeyPath != "" {
-		fmt.Println("SSH:")
-		fmt.Printf("  %s\n", profile.SSH.KeyPath)
+		appUI.KeyValue("SSH key", profile.SSH.KeyPath)
 	}
 }
 
@@ -587,10 +638,12 @@ func listProfiles() error {
 		return err
 	}
 	if len(cfg.Profiles) == 0 {
-		fmt.Println("No profiles found. Use 'gitid add work' to create one.")
+		appUI.Warning("No profiles found")
+		appUI.Hint("gitid add work")
 		return nil
 	}
-	fmt.Println("Profiles:")
+	appUI.Heading("Profiles")
+	rows := make([][]string, 0, len(cfg.Profiles))
 	for _, p := range cfg.Profiles {
 		mark := " "
 		if cfg.Active == p.Name {
@@ -600,8 +653,13 @@ func listProfiles() error {
 		if githubUser == "" {
 			githubUser = "-"
 		}
-		fmt.Printf("%s %-16s %s <%s> github:%s\n", mark, p.Name, p.Git.Username, p.Git.Email, githubUser)
+		sshKey := "no"
+		if p.SSH.KeyPath != "" {
+			sshKey = "yes"
+		}
+		rows = append(rows, []string{mark, p.Name, fmt.Sprintf("%s <%s>", p.Git.Username, p.Git.Email), githubUser, sshKey})
 	}
+	appUI.Println(appUI.ProfilesTable(rows))
 	return nil
 }
 
@@ -619,7 +677,56 @@ func removeProfile(name string) error {
 	if _, err := ssh.ApplyConfig(cfg, ssh.ApplyOptions{}); err != nil {
 		return err
 	}
-	fmt.Printf("Removed profile: %s\n", name)
+	appUI.Success("Removed profile %s", name)
+	return nil
+}
+
+func runAddForm(name, user, email, githubUser, sshKey *string, generateSSH, ghAuth *bool) error {
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Profile name").
+				Description("A short name like work, personal, or oss.").
+				Value(name).
+				Validate(huh.ValidateNotEmpty()),
+			huh.NewInput().
+				Title("Git author name").
+				Description("Used as git user.name.").
+				Value(user).
+				Validate(huh.ValidateNotEmpty()),
+			huh.NewInput().
+				Title("Git email").
+				Description("Used as git user.email.").
+				Value(email).
+				Validate(huh.ValidateNotEmpty()),
+		),
+		huh.NewGroup(
+			huh.NewInput().
+				Title("GitHub username").
+				Description("Optional. Defaults to the profile name.").
+				Value(githubUser),
+			huh.NewInput().
+				Title("SSH private key path").
+				Description("Optional. Example: ~/.ssh/work_ed25519").
+				Value(sshKey),
+			huh.NewConfirm().
+				Title("Generate SSH key if missing?").
+				Affirmative("Yes").
+				Negative("No").
+				Value(generateSSH),
+			huh.NewConfirm().
+				Title("Run GitHub CLI auth after adding?").
+				Affirmative("Yes").
+				Negative("No").
+				Value(ghAuth),
+		),
+	).WithTheme(huh.ThemeBase())
+	if err := form.Run(); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return errors.New("profile creation cancelled")
+		}
+		return err
+	}
 	return nil
 }
 
@@ -729,23 +836,32 @@ func sanitizeName(name string) string {
 }
 
 func ok(label, detail string) {
-	printCheck("OK", label, detail)
+	appUI.Check(ui.CheckOK, label, detail)
 }
 
 func warn(label, detail string) {
-	printCheck("WARN", label, detail)
+	appUI.Check(ui.CheckWarn, label, detail)
 }
 
 func fail(label, detail string) {
-	printCheck("FAIL", label, detail)
+	appUI.Check(ui.CheckFail, label, detail)
 }
 
-func printCheck(state, label, detail string) {
-	if detail == "" {
-		fmt.Printf("[%s] %s\n", state, label)
+func printDoctorHints(cfg *config.Config) {
+	hints := []string{}
+	if cfg.Active == "" {
+		hints = append(hints, "Set an active profile with gitid switch <profile>.")
+	}
+	if !cfg.AutoSwitchEnabled {
+		hints = append(hints, "Enable folder switching with gitid auto enable.")
+	}
+	if len(hints) == 0 {
 		return
 	}
-	fmt.Printf("[%s] %s: %s\n", state, label, detail)
+	appUI.Section("Suggested Fixes")
+	for _, hint := range hints {
+		appUI.Bullet(hint)
+	}
 }
 
 func firstLine(value, fallback string) string {
@@ -759,8 +875,13 @@ func firstLine(value, fallback string) string {
 	return value
 }
 
+func configureUI() {
+	appUI = ui.New(out, ui.Options{Plain: plain})
+}
+
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Print extra diagnostics")
+	rootCmd.PersistentFlags().BoolVar(&plain, "plain", false, "Force plain output without colors or symbols")
 
 	addProfileFlags(addCmd)
 	addProfileFlags(profileAddCmd)
