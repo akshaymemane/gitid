@@ -18,7 +18,7 @@ import (
 	"github.com/gitid/gitid/internal/ui"
 )
 
-var version = "0.2.2"
+var version = "0.3.0"
 
 var verbose bool
 var plain bool

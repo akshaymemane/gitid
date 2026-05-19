@@ -1,6 +1,6 @@
 {
   "name": "@akshaymemane/git-id",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Fast Git identity switching for developers",
   "author": "Akshay Memane",
   "homepage": "https://akshaymemane.github.io/gitid/",
