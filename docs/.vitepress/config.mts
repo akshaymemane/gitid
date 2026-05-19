@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
+  base: '/gitid/',
   title: 'GitID',
   description: 'Fast Git identity switching for developers',
   cleanUrls: true,

@@ -3,7 +3,7 @@
   "version": "0.2.1",
   "description": "Fast Git identity switching for developers",
   "author": "Akshay Memane",
-  "homepage": "https://github.com/akshaymemane/gitid#readme",
+  "homepage": "https://akshaymemane.github.io/gitid/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/akshaymemane/gitid.git"
