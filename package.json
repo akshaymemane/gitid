@@ -1,6 +1,6 @@
 {
   "name": "@akshaymemane/git-id",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Fast Git identity switching for developers",
   "author": "Akshay Memane",
   "homepage": "https://github.com/akshaymemane/gitid#readme",
@@ -16,6 +16,9 @@
   },
   "scripts": {
     "build": "sh scripts/build-npm.sh",
+    "docs:build": "vitepress build docs",
+    "docs:dev": "vitepress dev docs",
+    "docs:preview": "vitepress preview docs",
     "prepack": "npm run build",
     "test": "go test ./..."
   },
@@ -35,5 +38,8 @@
   "license": "MIT",
   "engines": {
     "node": ">=16"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
   }
 }

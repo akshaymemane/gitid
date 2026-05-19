@@ -68,6 +68,15 @@ gitid --plain doctor
 NO_COLOR=1 gitid list
 ```
 
+## Documentation
+
+The full VitePress documentation lives in `docs/`.
+
+```bash
+npm run docs:dev
+npm run docs:build
+```
+
 Useful aliases:
 
 ```bash

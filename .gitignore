@@ -1,5 +1,9 @@
 dist/
 /gitid
+node_modules/
+docs/.vitepress/cache/
+docs/.vitepress/.temp/
+docs/.vitepress/dist/
 *.exe
 *.log
 *.tmp
