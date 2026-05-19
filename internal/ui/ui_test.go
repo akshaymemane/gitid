@@ -33,3 +33,14 @@ func TestPlainProfilesTable(t *testing.T) {
 		}
 	}
 }
+
+func TestForceColorOverridesPlainTerminalDetection(t *testing.T) {
+	var out bytes.Buffer
+	view := New(&out, Options{Color: "always"})
+
+	view.Success("Initialized gitid")
+
+	if !strings.Contains(out.String(), "\x1b[") {
+		t.Fatalf("forced color output did not contain ANSI escape codes: %q", out.String())
+	}
+}

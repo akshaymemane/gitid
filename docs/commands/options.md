@@ -40,3 +40,27 @@ NO_COLOR=1 gitid doctor
 ```
 
 This is equivalent to asking for unstyled output.
+
+## `--color`
+
+Control color output explicitly.
+
+```bash
+gitid --color=auto doctor
+gitid --color=always doctor
+gitid --color=never doctor
+```
+
+Values:
+
+| Value | Behavior |
+| --- | --- |
+| `auto` | Use colors only when GitID detects an interactive color-capable terminal. |
+| `always` | Force ANSI color output. Useful when terminal detection is too conservative. |
+| `never` | Disable color output. |
+
+GitID also honors `FORCE_COLOR=1`:
+
+```bash
+FORCE_COLOR=1 gitid doctor
+```

@@ -42,6 +42,13 @@ For scripts, CI, or terminals where styled output is unwanted:
 
 ```bash
 gitid --plain doctor
+gitid --color=never list
 NO_COLOR=1 gitid list
 ```
 
+If your terminal supports color but GitID shows plain output, force color:
+
+```bash
+gitid --color=always doctor
+FORCE_COLOR=1 gitid list
+```

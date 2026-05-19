@@ -8,10 +8,12 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
+	"github.com/muesli/termenv"
 )
 
 type Options struct {
 	Plain bool
+	Color string
 }
 
 type UI struct {
@@ -39,23 +41,28 @@ const (
 )
 
 func New(out io.Writer, opts Options) *UI {
-	plain := opts.Plain || os.Getenv("NO_COLOR") != "" || !isTerminal(out)
+	forceColor := opts.Color == "always" || os.Getenv("FORCE_COLOR") != ""
+	plain := opts.Plain || opts.Color == "never" || (!forceColor && (os.Getenv("NO_COLOR") != "" || !isTerminal(out)))
+	renderer := lipgloss.NewRenderer(out)
+	if forceColor {
+		renderer.SetColorProfile(termenv.TrueColor)
+	}
 	return &UI{
 		out:   out,
 		plain: plain,
-		heading: lipgloss.NewStyle().
+		heading: renderer.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("39")).
 			MarginTop(1),
-		success: lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true),
-		warning: lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true),
-		failure: lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true),
-		muted:   lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
-		label:   lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
-		value:   lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
-		profile: lipgloss.NewStyle().Foreground(lipgloss.Color("81")).Bold(true),
-		path:    lipgloss.NewStyle().Foreground(lipgloss.Color("111")),
-		command: lipgloss.NewStyle().Foreground(lipgloss.Color("218")).Bold(true),
+		success: renderer.NewStyle().Foreground(lipgloss.Color("42")).Bold(true),
+		warning: renderer.NewStyle().Foreground(lipgloss.Color("214")).Bold(true),
+		failure: renderer.NewStyle().Foreground(lipgloss.Color("196")).Bold(true),
+		muted:   renderer.NewStyle().Foreground(lipgloss.Color("245")),
+		label:   renderer.NewStyle().Foreground(lipgloss.Color("245")),
+		value:   renderer.NewStyle().Foreground(lipgloss.Color("252")),
+		profile: renderer.NewStyle().Foreground(lipgloss.Color("81")).Bold(true),
+		path:    renderer.NewStyle().Foreground(lipgloss.Color("111")),
+		command: renderer.NewStyle().Foreground(lipgloss.Color("218")).Bold(true),
 	}
 }
 

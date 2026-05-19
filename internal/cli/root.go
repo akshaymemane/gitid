@@ -24,6 +24,7 @@ import (
 
 var verbose bool
 var plain bool
+var colorMode string
 var out io.Writer = os.Stdout
 var errOut io.Writer = os.Stderr
 var appUI = ui.New(os.Stdout, ui.Options{})
@@ -876,12 +877,13 @@ func firstLine(value, fallback string) string {
 }
 
 func configureUI() {
-	appUI = ui.New(out, ui.Options{Plain: plain})
+	appUI = ui.New(out, ui.Options{Plain: plain, Color: colorMode})
 }
 
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Print extra diagnostics")
 	rootCmd.PersistentFlags().BoolVar(&plain, "plain", false, "Force plain output without colors or symbols")
+	rootCmd.PersistentFlags().StringVar(&colorMode, "color", "auto", "Color output: auto, always, or never")
 
 	addProfileFlags(addCmd)
 	addProfileFlags(profileAddCmd)

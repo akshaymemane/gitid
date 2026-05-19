@@ -65,7 +65,15 @@ Plain output for automation:
 
 ```bash
 gitid --plain doctor
+gitid --color=never list
 NO_COLOR=1 gitid list
+```
+
+Force color when your terminal supports it but detection is too conservative:
+
+```bash
+gitid --color=always doctor
+FORCE_COLOR=1 gitid list
 ```
 
 ## Documentation
