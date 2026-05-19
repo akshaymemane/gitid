@@ -13,6 +13,10 @@ npm install -g @akshaymemane/git-id
 
 The npm package installs the `gitid` command. macOS and Linux binaries are bundled for arm64 and x64.
 
+## Demo
+
+![GitID terminal demo](docs/public/demo.gif)
+
 ## What's New in 0.2
 
 GitID now uses Charm libraries for a cleaner terminal experience:

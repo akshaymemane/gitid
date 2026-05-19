@@ -41,6 +41,8 @@ gitid switch work
 gitid doctor
 ```
 
+![GitID terminal demo](/demo.gif)
+
 GitID helps you manage:
 
 - Git commit name and email
@@ -54,4 +56,3 @@ GitID helps you manage:
 GitID is not trying to be an enterprise identity platform. It is a small, fast CLI that makes everyday Git identity work predictable.
 
 The goal is not cleverness. The goal is calm.
-
