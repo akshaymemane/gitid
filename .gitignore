@@ -1,0 +1,6 @@
+dist/
+/gitid
+*.exe
+*.log
+*.tmp
+*.tgz
